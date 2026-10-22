@@ -1,0 +1,32 @@
+# White Monkey (Fabric 1.21.11)
+
+Mod com o **White Monkey** (modelo do Blockbench), animações **idle / walk / eating**,
+item aparecendo no bone **`item_eat`** ao comer, e **equipar no ombro**.
+
+## Como usar no jogo
+- `/summon white_monkey:white_monkey` ou o **Ovo de Geração** (aba Spawn Eggs).
+- **Botão direito com comida** no macaco → ele come (animação `eating`, o item aparece no bone `item_eat`, ele se cura).
+- **Shift + botão direito no macaco** → ele sobe no seu **ombro direito**.
+- **Shift + botão direito com a mão vazia** (no ar) → tira o macaco do ombro.
+- Ao sair do mundo, o macaco desce do ombro automaticamente (não some).
+
+## Compilar
+1. Java 21. Gradle 9.x (ou copie `gradlew`, `gradlew.bat` e `gradle/wrapper/gradle-wrapper.jar`
+   do template oficial em https://fabricmc.net/develop/template/ — só falta o `.jar` do wrapper).
+2. `./gradlew runClient` para testar, `./gradlew build` para gerar o `.jar` em `build/libs/`.
+
+Mappings: **Mojang** (`loom.officialMojangMappings()`). Fabric API 0.141.5+1.21.11, Loader 0.18.4, Loom 1.14.
+
+## Editar o modelo/animações no Blockbench
+Salve o projeto em `tools/white_monkey.bbmodel` e rode:
+
+    python3 tools/bbmodel_to_java.py tools/white_monkey.bbmodel --verify
+
+Isso regenera `MonkeyModelData.java`, `MonkeyAnimations.java` e a textura. Os nomes dos grupos
+(`head`, `left_arm`, `item_eat`...) devem ser mantidos. A animação de `eating` deve animar a
+**escala** do grupo `item_eat` (0 → 1) para mostrar/esconder o item.
+
+## Ajustes rápidos
+- Posição/tamanho no ombro: constantes `SHOULDER_*` em `MonkeyRenderer.java`.
+- Tamanho do item comido: `ITEM_SCALE` em `MonkeyEatItemLayer.java`.
+- Duração de comer: `EAT_DURATION` em `MonkeyEntity.java`.
