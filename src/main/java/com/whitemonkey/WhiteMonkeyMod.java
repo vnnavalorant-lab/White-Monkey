@@ -4,7 +4,7 @@ import com.whitemonkey.entity.MonkeyEntity;
 import com.whitemonkey.registry.ModEntities;
 import com.whitemonkey.registry.ModItems;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.entity.event.v1.FabricDefaultAttributeRegistry;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.resources.Identifier;
