@@ -5,6 +5,7 @@ item aparecendo no bone **`item_eat`** ao comer, e **equipar no ombro**.
 
 ## Como usar no jogo
 - `/summon white_monkey:white_monkey` ou o **Ovo de Geração** (aba Spawn Eggs).
+- **Domar:** alimentar o macaco (ou colocá-lo no ombro) o doma. Ele passa a **seguir você**, fica ao seu lado e só obedece ao dono (o dono é salvo no mundo).
 - **Botão direito com comida** no macaco → ele come (animação `eating`, o item aparece no bone `item_eat`, ele se cura).
 - **Shift + botão direito no macaco** → ele sobe no seu **ombro direito**.
 - **Shift + botão direito em um bloco** (pode ser com a mão vazia) → coloca o macaco no chão.

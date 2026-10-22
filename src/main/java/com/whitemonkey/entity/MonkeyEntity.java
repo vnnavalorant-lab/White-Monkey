@@ -2,6 +2,7 @@ package com.whitemonkey.entity;
 
 import java.lang.reflect.Constructor;
 import java.util.EnumSet;
+import java.util.UUID;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ItemParticleOption;
@@ -32,6 +33,8 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.RandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.TemptGoal;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -49,6 +52,8 @@ public class MonkeyEntity extends PathfinderMob {
 	private static final EntityDataAccessor<Integer> OWNER_ID =
 			SynchedEntityData.defineId(MonkeyEntity.class, EntityDataSerializers.INT);
 
+	/** Dono (domado ao ser alimentado ou ao subir no ombro). Salvo no mundo. */
+	private UUID ownerUuid;
 	private int eatTicks;
 	/** começa true para "limpar" estados de ombro que ficaram salvos (gravidade/invulnerável) no 1º tick */
 	private boolean perchedGodMode = true;
@@ -71,9 +76,10 @@ public class MonkeyEntity extends PathfinderMob {
 		this.goalSelector.addGoal(1, new EatingFreezeGoal(this));
 		this.goalSelector.addGoal(2, new PanicGoal(this, 1.4));
 		this.goalSelector.addGoal(3, new TemptGoal(this, 1.1, stack -> stack.has(DataComponents.FOOD), false));
-		this.goalSelector.addGoal(4, new RandomStrollGoal(this, 0.9));
-		this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 6.0F));
-		this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(4, new FollowOwnerGoal(this, 1.2, 5.0F, 2.0F));
+		this.goalSelector.addGoal(5, new RandomStrollGoal(this, 0.9));
+		this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
 	}
 
 	@Override
@@ -99,8 +105,13 @@ public class MonkeyEntity extends PathfinderMob {
 	}
 
 	private void startEating(ItemStack food) {
-		this.entityData.set(EAT_STACK, food.copyWithCount(1));
+		ItemStack one = food.copyWithCount(1);
+		this.entityData.set(EAT_STACK, one);
 		this.entityData.set(EATING, true);
+		// O macaco "usa" o item na mão, igual ao jogador comendo: o próprio jogo gera as partículas
+		// de pedaços do item saindo da boca e o som de mastigar (cliente e servidor).
+		this.setItemInHand(InteractionHand.MAIN_HAND, one.copy());
+		this.startUsingItem(InteractionHand.MAIN_HAND);
 		this.eatTicks = 0;
 		this.getNavigation().stop();
 	}
@@ -110,6 +121,8 @@ public class MonkeyEntity extends PathfinderMob {
 		if (food != null) {
 			this.heal(Math.max(1, food.nutrition()));
 		}
+		this.stopUsingItem();
+		this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
 		this.entityData.set(EATING, false);
 		this.entityData.set(EAT_STACK, ItemStack.EMPTY);
 		this.eatTicks = 0;
@@ -153,6 +166,56 @@ public class MonkeyEntity extends PathfinderMob {
 	/** SoundEvents.GENERIC_EAT pode ser SoundEvent ou Holder dependendo da versão; isto aceita os dois. */
 	private static SoundEvent unwrap(Object sound) {
 		return sound instanceof Holder<?> holder ? (SoundEvent) holder.value() : (SoundEvent) sound;
+	}
+
+	// ------------------------------------------------------------------ domesticação
+	public boolean isTamed() {
+		return this.ownerUuid != null;
+	}
+
+	public UUID getOwnerUuid() {
+		return this.ownerUuid;
+	}
+
+	public boolean isOwnedBy(Player player) {
+		return this.ownerUuid != null && this.ownerUuid.equals(player.getUUID());
+	}
+
+	/** Dono atual se estiver no mesmo mundo/online, senão null. */
+	public Player getOwner() {
+		return this.ownerUuid == null ? null : this.level().getPlayerByUUID(this.ownerUuid);
+	}
+
+	private void tame(Player player) {
+		if (this.isTamed()) return;
+		this.ownerUuid = player.getUUID();
+		player.sendSystemMessage(Component.translatable("message.white_monkey.tamed"));
+		if (this.level() instanceof ServerLevel server) {
+			server.sendParticles(ParticleTypes.HEART, this.getX(), this.getY() + 0.9, this.getZ(),
+					7, 0.4, 0.4, 0.4, 0.02);
+		}
+	}
+
+	@Override
+	protected void addAdditionalSaveData(ValueOutput output) {
+		super.addAdditionalSaveData(output);
+		if (this.ownerUuid != null) {
+			output.putString("OwnerUUID", this.ownerUuid.toString());
+		}
+	}
+
+	@Override
+	protected void readAdditionalSaveData(ValueInput input) {
+		super.readAdditionalSaveData(input);
+		this.ownerUuid = null;
+		String id = input.getString("OwnerUUID").orElse("");
+		if (!id.isEmpty()) {
+			try {
+				this.ownerUuid = UUID.fromString(id);
+			} catch (IllegalArgumentException ignored) {
+				// UUID inválido: monkey volta a ser selvagem
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ capacete
@@ -262,9 +325,18 @@ public class MonkeyEntity extends PathfinderMob {
 	// ------------------------------------------------------------------ interação
 	@Override
 	public InteractionResult mobInteract(Player player, InteractionHand hand) {
+		// Macaco domado só obedece ao dono
+		if (this.isTamed() && !this.isOwnedBy(player)) {
+			if (!this.level().isClientSide()) {
+				player.sendSystemMessage(Component.translatable("message.white_monkey.not_yours"));
+			}
+			return InteractionResult.SUCCESS;
+		}
+
 		// Shift + botão direito -> equipar no ombro
 		if (player.isShiftKeyDown()) {
 			if (!this.level().isClientSide()) {
+				this.tame(player);
 				if (!this.mountOnShoulder(player)) {
 					player.sendSystemMessage(Component.translatable("message.white_monkey.shoulder_full"));
 				}
@@ -276,6 +348,7 @@ public class MonkeyEntity extends PathfinderMob {
 		ItemStack stack = player.getItemInHand(hand);
 		if (!this.isEating() && !this.isOnShoulder() && stack.has(DataComponents.FOOD)) {
 			if (!this.level().isClientSide()) {
+				this.tame(player); // alimentar doma o macaco
 				this.startEating(stack);
 				stack.consume(1, player);
 			}
@@ -314,11 +387,11 @@ public class MonkeyEntity extends PathfinderMob {
 				if (this.isOnShoulder() || this.getEatStack().isEmpty()) {
 					this.finishEating();
 				} else {
-					if (this.eatTicks % 8 == 4) {
+					if (!this.isUsingItem() && this.eatTicks % 8 == 4) {
 						this.playSound(unwrap(SoundEvents.GENERIC_EAT), 0.6F, 0.9F + this.random.nextFloat() * 0.3F);
 					}
 					// o item só está visível na animação entre ~0,5 s e ~1,6 s
-					if (this.eatTicks % 3 == 0 && this.eatTicks >= 12 && this.eatTicks <= 34) {
+					if (!this.isUsingItem() && this.eatTicks % 3 == 0 && this.eatTicks >= 12 && this.eatTicks <= 34) {
 						this.spawnEatParticles();
 					}
 				}
@@ -340,6 +413,71 @@ public class MonkeyEntity extends PathfinderMob {
 			}
 		} else if (!this.level().isClientSide()) {
 			this.releasePerchState();
+		}
+	}
+
+	/** Segue o dono (se domado), a menos que esteja comendo ou no ombro. */
+	private static class FollowOwnerGoal extends Goal {
+		private final MonkeyEntity monkey;
+		private final double speed;
+		private final float startDistance;
+		private final float stopDistance;
+		private Player owner;
+		private int recalcTicks;
+
+		FollowOwnerGoal(MonkeyEntity monkey, double speed, float startDistance, float stopDistance) {
+			this.monkey = monkey;
+			this.speed = speed;
+			this.startDistance = startDistance;
+			this.stopDistance = stopDistance;
+			this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+		}
+
+		@Override
+		public boolean canUse() {
+			if (!this.monkey.isTamed() || this.monkey.isEating() || this.monkey.isOnShoulder()) return false;
+			Player player = this.monkey.getOwner();
+			if (player == null || player.isSpectator() || !player.isAlive()) return false;
+			if (this.monkey.distanceToSqr(player) < (double) (this.startDistance * this.startDistance)) return false;
+			this.owner = player;
+			return true;
+		}
+
+		@Override
+		public boolean canContinueToUse() {
+			if (this.owner == null || !this.owner.isAlive() || this.owner.isSpectator()) return false;
+			if (this.monkey.isEating() || this.monkey.isOnShoulder()) return false;
+			return this.monkey.distanceToSqr(this.owner) > (double) (this.stopDistance * this.stopDistance);
+		}
+
+		@Override
+		public void start() {
+			this.recalcTicks = 0;
+		}
+
+		@Override
+		public void stop() {
+			this.owner = null;
+			this.monkey.getNavigation().stop();
+		}
+
+		@Override
+		public boolean requiresUpdateEveryTick() {
+			return true;
+		}
+
+		@Override
+		public void tick() {
+			this.monkey.getLookControl().setLookAt(this.owner, 10.0F, (float) this.monkey.getMaxHeadXRot());
+			if (--this.recalcTicks > 0) return;
+			this.recalcTicks = 10;
+			// muito longe (ex.: o dono correu/teleportou): aparece ao lado dele
+			if (this.monkey.distanceToSqr(this.owner) >= 24.0 * 24.0) {
+				this.monkey.setPos(this.owner.getX() + 0.8, this.owner.getY(), this.owner.getZ() + 0.8);
+				this.monkey.getNavigation().stop();
+				return;
+			}
+			this.monkey.getNavigation().moveTo(this.owner, this.speed);
 		}
 	}
 

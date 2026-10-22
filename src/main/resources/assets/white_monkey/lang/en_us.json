@@ -1,5 +1,7 @@
 {
   "entity.white_monkey.white_monkey": "White Monkey",
   "item.white_monkey.white_monkey_spawn_egg": "White Monkey Spawn Egg",
-  "message.white_monkey.shoulder_full": "You already have a monkey on your shoulder!"
+  "message.white_monkey.shoulder_full": "You already have a monkey on your shoulder!",
+  "message.white_monkey.tamed": "The monkey likes you now!",
+  "message.white_monkey.not_yours": "This monkey belongs to someone else."
 }
