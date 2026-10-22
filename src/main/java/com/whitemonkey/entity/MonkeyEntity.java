@@ -10,6 +10,7 @@ import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -166,7 +167,9 @@ public class MonkeyEntity extends PathfinderMob {
 
 	private void giveBack(Player player, ItemStack stack) {
 		if (!stack.isEmpty() && !player.getInventory().add(stack)) {
-			player.drop(stack, false);
+			ItemEntity drop = new ItemEntity(player.level(), player.getX(), player.getY() + 0.5, player.getZ(), stack);
+			drop.setDefaultPickUpDelay();
+			player.level().addFreshEntity(drop);
 		}
 	}
 
@@ -200,7 +203,6 @@ public class MonkeyEntity extends PathfinderMob {
 		this.getNavigation().stop();
 		this.entityData.set(OWNER_ID, player.getId());
 		this.perchedGodMode = true;
-		this.setInvulnerable(true); // evita sufocar em paredes quando o jogador passa por vãos
 		this.setNoGravity(true);
 		this.noPhysics = true; // sem colisão: não empurra o jogador nem é empurrado
 		return true;
@@ -223,7 +225,6 @@ public class MonkeyEntity extends PathfinderMob {
 	private void releasePerchState() {
 		if (this.perchedGodMode) {
 			this.perchedGodMode = false;
-			this.setInvulnerable(false);
 			this.setNoGravity(false);
 		}
 		this.noPhysics = false;
@@ -265,7 +266,7 @@ public class MonkeyEntity extends PathfinderMob {
 		if (player.isShiftKeyDown()) {
 			if (!this.level().isClientSide()) {
 				if (!this.mountOnShoulder(player)) {
-					player.displayClientMessage(Component.translatable("message.white_monkey.shoulder_full"), true);
+					player.sendSystemMessage(Component.translatable("message.white_monkey.shoulder_full"));
 				}
 			}
 			return InteractionResult.SUCCESS;
