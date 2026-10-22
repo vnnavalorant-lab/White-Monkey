@@ -11,4 +11,6 @@ public class MonkeyRenderState extends LivingEntityRenderState {
 	public boolean onShoulder;
 	/** Item que aparece no bone "item_eat". */
 	public final ItemStackRenderState eatItem = new ItemStackRenderState();
+	/** Capacete na cabeça. */
+	public final ItemStackRenderState hatItem = new ItemStackRenderState();
 }

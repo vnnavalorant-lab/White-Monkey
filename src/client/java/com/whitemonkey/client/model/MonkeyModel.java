@@ -15,6 +15,7 @@ public class MonkeyModel extends EntityModel<MonkeyRenderState> {
 
 	private final Map<String, ModelPart> bones = new HashMap<>();
 	private final ModelPart head;
+	private final Map<String, ModelPart[]> chains = new HashMap<>();
 	private final ModelPart[] itemEatChain;
 
 	public MonkeyModel(ModelPart root) {
@@ -29,6 +30,7 @@ public class MonkeyModel extends EntityModel<MonkeyRenderState> {
 			}
 			String name = path[path.length - 1];
 			this.bones.put(name, part);
+			this.chains.put(name, acc);
 			if (name.equals("item_eat")) chain = acc;
 		}
 		this.head = this.bones.get("head");
@@ -59,6 +61,15 @@ public class MonkeyModel extends EntityModel<MonkeyRenderState> {
 	/** Aplica no PoseStack a transformação completa do bone item_eat (root > body > item_eat). */
 	public void translateToItemEat(PoseStack poseStack) {
 		for (ModelPart part : this.itemEatChain) {
+			part.translateAndRotate(poseStack);
+		}
+	}
+
+	/** Aplica no PoseStack a transformação completa de qualquer bone (ex.: "head"). */
+	public void translateTo(String bone, PoseStack poseStack) {
+		ModelPart[] chain = this.chains.get(bone);
+		if (chain == null) return;
+		for (ModelPart part : chain) {
 			part.translateAndRotate(poseStack);
 		}
 	}

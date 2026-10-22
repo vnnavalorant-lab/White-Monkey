@@ -24,6 +24,7 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 		super(context, new MonkeyModel(context.bakeLayer(MonkeyModel.LAYER)), 0.35F);
 		this.itemResolver = context.getItemModelResolver();
 		this.addLayer(new MonkeyEatItemLayer(this));
+		this.addLayer(new MonkeyHatLayer(this));
 	}
 
 	@Override
@@ -43,10 +44,15 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 		state.onShoulder = entity.isOnShoulder();
 		state.eating = entity.isEating();
 
-		if (state.eating) {
+		if (state.onShoulder) {
+			// no ombro: SOMENTE idle
+			state.eating = false;
+			state.clip = MonkeyAnimations.IDLE;
+			state.clipSeconds = state.ageInTicks / 20.0F;
+		} else if (state.eating) {
 			state.clip = MonkeyAnimations.EATING;
 			state.clipSeconds = (entity.getEatTicks() + partialTick) / 20.0F;
-		} else if (!state.onShoulder && state.walkAnimationSpeed > 0.03F) {
+		} else if (state.walkAnimationSpeed > 0.03F) {
 			state.clip = MonkeyAnimations.WALK;
 			state.clipSeconds = state.walkAnimationPos / 12.0F; // 1 ciclo a cada ~12 unidades de passo
 		} else {
@@ -59,6 +65,13 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 			this.itemResolver.updateForLiving(state.eatItem, eat, ItemDisplayContext.GROUND, entity);
 		} else {
 			state.eatItem.clear();
+		}
+
+		ItemStack hat = entity.getHelmet();
+		if (!hat.isEmpty()) {
+			this.itemResolver.updateForLiving(state.hatItem, hat, ItemDisplayContext.HEAD, entity);
+		} else {
+			state.hatItem.clear();
 		}
 	}
 

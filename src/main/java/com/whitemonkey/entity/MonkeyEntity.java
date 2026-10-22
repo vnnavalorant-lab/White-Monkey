@@ -3,6 +3,10 @@ package com.whitemonkey.entity;
 import java.util.EnumSet;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -42,10 +46,12 @@ public class MonkeyEntity extends PathfinderMob {
 			SynchedEntityData.defineId(MonkeyEntity.class, EntityDataSerializers.INT);
 
 	private int eatTicks;
-	private boolean perchedGodMode;
+	/** começa true para "limpar" estados de ombro que ficaram salvos (gravidade/invulnerável) no 1º tick */
+	private boolean perchedGodMode = true;
 
 	public MonkeyEntity(EntityType<? extends MonkeyEntity> type, Level level) {
 		super(type, level);
+		this.setDropChance(EquipmentSlot.HEAD, 1.0F); // o capacete sempre cai quando o macaco morre
 	}
 
 	public static AttributeSupplier.Builder createAttributes() {
@@ -105,9 +111,36 @@ public class MonkeyEntity extends PathfinderMob {
 		this.eatTicks = 0;
 	}
 
+	/** Partículas de pedaços do item saindo da "mão" (bone item_eat) do macaco. */
+	private void spawnEatParticles() {
+		if (!(this.level() instanceof ServerLevel server) || this.getEatStack().isEmpty()) return;
+		double yaw = Math.toRadians(this.yBodyRot);
+		double x = this.getX() - Math.sin(yaw) * 0.38;
+		double y = this.getY() + 0.5;
+		double z = this.getZ() + Math.cos(yaw) * 0.38;
+		server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, this.getEatStack()),
+				x, y, z, 4, 0.06, 0.06, 0.06, 0.03);
+	}
+
 	/** SoundEvents.GENERIC_EAT pode ser SoundEvent ou Holder dependendo da versão; isto aceita os dois. */
 	private static SoundEvent unwrap(Object sound) {
 		return sound instanceof Holder<?> holder ? (SoundEvent) holder.value() : (SoundEvent) sound;
+	}
+
+	// ------------------------------------------------------------------ capacete
+	private static boolean isHelmet(ItemStack stack) {
+		var equippable = stack.get(DataComponents.EQUIPPABLE);
+		return equippable != null && equippable.slot() == EquipmentSlot.HEAD;
+	}
+
+	public ItemStack getHelmet() {
+		return this.getItemBySlot(EquipmentSlot.HEAD);
+	}
+
+	private void giveBack(Player player, ItemStack stack) {
+		if (!stack.isEmpty() && !player.getInventory().add(stack)) {
+			player.drop(stack, false);
+		}
 	}
 
 	// ------------------------------------------------------------------ ombro
@@ -142,6 +175,7 @@ public class MonkeyEntity extends PathfinderMob {
 		this.perchedGodMode = true;
 		this.setInvulnerable(true); // evita sufocar em paredes quando o jogador passa por vãos
 		this.setNoGravity(true);
+		this.noPhysics = true; // sem colisão: não empurra o jogador nem é empurrado
 		return true;
 	}
 
@@ -157,6 +191,7 @@ public class MonkeyEntity extends PathfinderMob {
 			this.setInvulnerable(false);
 			this.setNoGravity(false);
 		}
+		this.noPhysics = false;
 	}
 
 	/** Coloca o macaco no ombro direito do jogador e copia a direção do corpo/cabeça dele. */
@@ -168,6 +203,7 @@ public class MonkeyEntity extends PathfinderMob {
 		double x = owner.getX() + rightX * 0.34;
 		double y = owner.getY() + owner.getBbHeight() * 0.76;
 		double z = owner.getZ() + rightZ * 0.34;
+		this.noPhysics = true;
 		this.setPos(x, y, z);
 		this.setDeltaMovement(0, 0, 0);
 		this.setYRot(yaw);
@@ -209,6 +245,26 @@ public class MonkeyEntity extends PathfinderMob {
 			}
 			return InteractionResult.SUCCESS;
 		}
+
+		// Botão direito com um capacete -> o macaco veste (troca se já tiver um)
+		if (isHelmet(stack)) {
+			if (!this.level().isClientSide()) {
+				ItemStack old = this.getHelmet().copy();
+				this.setItemSlot(EquipmentSlot.HEAD, stack.copyWithCount(1));
+				stack.consume(1, player);
+				this.giveBack(player, old);
+			}
+			return InteractionResult.SUCCESS;
+		}
+
+		// Botão direito com a mão vazia -> tira o capacete
+		if (stack.isEmpty() && !this.getHelmet().isEmpty()) {
+			if (!this.level().isClientSide()) {
+				this.giveBack(player, this.getHelmet().copy());
+				this.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
+			}
+			return InteractionResult.SUCCESS;
+		}
 		return super.mobInteract(player, hand);
 	}
 
@@ -221,8 +277,14 @@ public class MonkeyEntity extends PathfinderMob {
 			if (!this.level().isClientSide()) {
 				if (this.isOnShoulder() || this.getEatStack().isEmpty()) {
 					this.finishEating();
-				} else if (this.eatTicks % 8 == 4) {
-					this.playSound(unwrap(SoundEvents.GENERIC_EAT), 0.6F, 0.9F + this.random.nextFloat() * 0.3F);
+				} else {
+					if (this.eatTicks % 8 == 4) {
+						this.playSound(unwrap(SoundEvents.GENERIC_EAT), 0.6F, 0.9F + this.random.nextFloat() * 0.3F);
+					}
+					// o item só está visível na animação entre ~0,5 s e ~1,6 s
+					if (this.eatTicks % 3 == 0 && this.eatTicks >= 12 && this.eatTicks <= 34) {
+						this.spawnEatParticles();
+					}
 				}
 				if (this.eatTicks >= EAT_DURATION) {
 					this.finishEating();
