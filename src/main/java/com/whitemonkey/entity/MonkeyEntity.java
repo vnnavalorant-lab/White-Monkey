@@ -185,6 +185,14 @@ public class MonkeyEntity extends PathfinderMob {
 		this.releasePerchState();
 	}
 
+	/** Tira do ombro e coloca o macaco em um ponto (ex.: no chão). */
+	public void dismountAt(double x, double y, double z) {
+		this.dismountFromShoulder();
+		this.setPos(x, y, z);
+		this.setDeltaMovement(0, 0, 0);
+		this.fallDistance = 0;
+	}
+
 	private void releasePerchState() {
 		if (this.perchedGodMode) {
 			this.perchedGodMode = false;

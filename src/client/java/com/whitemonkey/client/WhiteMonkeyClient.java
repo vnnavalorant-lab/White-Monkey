@@ -1,5 +1,6 @@
 package com.whitemonkey.client;
 
+import com.whitemonkey.client.model.MonkeyHatModel;
 import com.whitemonkey.client.model.MonkeyModel;
 import com.whitemonkey.client.model.MonkeyModelData;
 import com.whitemonkey.client.render.MonkeyRenderer;
@@ -12,6 +13,7 @@ public class WhiteMonkeyClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		EntityModelLayerRegistry.registerModelLayer(MonkeyModel.LAYER, MonkeyModelData::createBodyLayer);
+		EntityModelLayerRegistry.registerModelLayer(MonkeyHatModel.LAYER, MonkeyHatModel::createLayer);
 		EntityRenderers.register(ModEntities.WHITE_MONKEY, MonkeyRenderer::new);
 	}
 }

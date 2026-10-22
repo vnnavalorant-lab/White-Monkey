@@ -7,7 +7,9 @@ item aparecendo no bone **`item_eat`** ao comer, e **equipar no ombro**.
 - `/summon white_monkey:white_monkey` ou o **Ovo de Geração** (aba Spawn Eggs).
 - **Botão direito com comida** no macaco → ele come (animação `eating`, o item aparece no bone `item_eat`, ele se cura).
 - **Shift + botão direito no macaco** → ele sobe no seu **ombro direito**.
-- **Shift + botão direito com a mão vazia** (no ar) → tira o macaco do ombro.
+- **Shift + botão direito em um bloco** (pode ser com a mão vazia) → coloca o macaco no chão.
+- **Shift + botão direito no ar com qualquer item na mão** → o macaco desce do ombro.
+- **Botão direito com um capacete** → o macaco veste (renderizado como armadura de verdade). Mão vazia → tira.
 - Ao sair do mundo, o macaco desce do ombro automaticamente (não some).
 
 ## Compilar

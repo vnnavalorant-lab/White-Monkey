@@ -3,6 +3,7 @@ package com.whitemonkey.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.whitemonkey.WhiteMonkeyMod;
 import com.whitemonkey.client.anim.MonkeyAnimations;
+import com.whitemonkey.client.model.MonkeyHatModel;
 import com.whitemonkey.client.model.MonkeyModel;
 import com.whitemonkey.entity.MonkeyEntity;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -24,7 +25,8 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 		super(context, new MonkeyModel(context.bakeLayer(MonkeyModel.LAYER)), 0.35F);
 		this.itemResolver = context.getItemModelResolver();
 		this.addLayer(new MonkeyEatItemLayer(this));
-		this.addLayer(new MonkeyHatLayer(this));
+		this.addLayer(new MonkeyHatLayer(this,
+				new MonkeyHatModel(context.bakeLayer(MonkeyHatModel.LAYER)), context.getEquipmentRenderer()));
 	}
 
 	@Override
@@ -68,6 +70,7 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 		}
 
 		ItemStack hat = entity.getHelmet();
+		state.hatStack = hat.copy();
 		if (!hat.isEmpty()) {
 			this.itemResolver.updateForLiving(state.hatItem, hat, ItemDisplayContext.HEAD, entity);
 		} else {
