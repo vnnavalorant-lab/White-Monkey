@@ -1,4 +1,4 @@
-# White Monkey (Fabric 1.21.11)
+# White Monkey (Fabric 26.3)
 
 Mod com o **White Monkey** (modelo do Blockbench), animações **idle / walk / eating**,
 item aparecendo no bone **`item_eat`** ao comer, e **equipar no ombro**.
@@ -13,11 +13,11 @@ item aparecendo no bone **`item_eat`** ao comer, e **equipar no ombro**.
 - Ao sair do mundo, o macaco desce do ombro automaticamente (não some).
 
 ## Compilar
-1. Java 21. Gradle 9.x (ou copie `gradlew`, `gradlew.bat` e `gradle/wrapper/gradle-wrapper.jar`
+1. **Java 25**. Gradle 9.6 (ou copie `gradlew`, `gradlew.bat` e `gradle/wrapper/gradle-wrapper.jar`
    do template oficial em https://fabricmc.net/develop/template/ — só falta o `.jar` do wrapper).
 2. `./gradlew runClient` para testar, `./gradlew build` para gerar o `.jar` em `build/libs/`.
 
-Mappings: **Mojang** (`loom.officialMojangMappings()`). Fabric API 0.141.5+1.21.11, Loader 0.18.4, Loom 1.14.
+Minecraft 26.3 (sem ofuscação, nomes oficiais da Mojang). Loom 1.17 (`net.fabricmc.fabric-loom`), Fabric Loader 0.19.5, Fabric API 0.161.0+26.3.
 
 ## Editar o modelo/animações no Blockbench
 Salve o projeto em `tools/white_monkey.bbmodel` e rode:

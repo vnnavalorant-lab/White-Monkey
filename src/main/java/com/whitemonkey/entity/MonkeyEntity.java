@@ -1,9 +1,12 @@
 package com.whitemonkey.entity;
 
+import java.lang.reflect.Constructor;
 import java.util.EnumSet;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -118,8 +121,32 @@ public class MonkeyEntity extends PathfinderMob {
 		double x = this.getX() - Math.sin(yaw) * 0.38;
 		double y = this.getY() + 0.5;
 		double z = this.getZ() + Math.cos(yaw) * 0.38;
-		server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, this.getEatStack()),
-				x, y, z, 4, 0.06, 0.06, 0.06, 0.03);
+		ParticleOptions options = itemParticle(this.getEatStack());
+		if (options != null) {
+			server.sendParticles(options, x, y, z, 4, 0.06, 0.06, 0.06, 0.03);
+		}
+	}
+
+	/**
+	 * Cria a partícula "item" (pedaços do item). Desde o 26.1 algumas APIs usam ItemStackTemplate no lugar de
+	 * ItemStack; a reflexão aceita qualquer um dos dois construtores e evita erro de compilação entre versões.
+	 */
+	private static ParticleOptions itemParticle(ItemStack stack) {
+		try {
+			for (Constructor<?> c : ItemParticleOption.class.getConstructors()) {
+				Class<?>[] types = c.getParameterTypes();
+				if (types.length == 2 && ParticleType.class.isAssignableFrom(types[0])) {
+					Object arg = stack;
+					if (!types[1].isInstance(stack)) {
+						arg = types[1].getMethod("fromNonEmptyStack", ItemStack.class).invoke(null, stack);
+					}
+					return (ParticleOptions) c.newInstance(ParticleTypes.ITEM, arg);
+				}
+			}
+		} catch (ReflectiveOperationException | RuntimeException ignored) {
+			// sem partículas, mas sem quebrar o jogo
+		}
+		return null;
 	}
 
 	/** SoundEvents.GENERIC_EAT pode ser SoundEvent ou Holder dependendo da versão; isto aceita os dois. */

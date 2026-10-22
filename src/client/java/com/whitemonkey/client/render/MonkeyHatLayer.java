@@ -44,7 +44,7 @@ public class MonkeyHatLayer extends RenderLayer<MonkeyRenderState, MonkeyModel> 
 					this.hatModel, state, state.hatStack, poseStack, collector, light, state.outlineColor);
 		} else if (!state.hatItem.isEmpty()) {
 			poseStack.translate(0.0F, -0.25F, 0.0F);
-			poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
+			poseStack.rotate(Axis.YP.rotationDegrees(180.0F));
 			poseStack.scale(0.625F, -0.625F, -0.625F);
 			state.hatItem.submit(poseStack, collector, light, OverlayTexture.NO_OVERLAY, state.outlineColor);
 		}

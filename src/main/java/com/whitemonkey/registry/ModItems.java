@@ -2,7 +2,7 @@ package com.whitemonkey.registry;
 
 import com.whitemonkey.WhiteMonkeyMod;
 import java.util.function.Function;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -25,7 +25,7 @@ public final class ModItems {
 	}
 
 	public static void init() {
-		ItemGroupEvents.modifyEntriesEvent(CreativeModeTabs.SPAWN_EGGS)
-				.register(group -> group.accept(WHITE_MONKEY_SPAWN_EGG));
+		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.SPAWN_EGGS)
+				.register(output -> output.accept(WHITE_MONKEY_SPAWN_EGG));
 	}
 }

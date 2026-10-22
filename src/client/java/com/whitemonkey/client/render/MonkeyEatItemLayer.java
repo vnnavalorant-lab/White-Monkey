@@ -29,7 +29,7 @@ public class MonkeyEatItemLayer extends RenderLayer<MonkeyRenderState, MonkeyMod
 		model.translateToItemEat(poseStack);
 		// desfaz o flip (-1,-1,1) do espaço de modelo e vira o item para frente
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
-		poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
+		poseStack.rotate(Axis.YP.rotationDegrees(180.0F));
 		poseStack.scale(ITEM_SCALE, ITEM_SCALE, ITEM_SCALE);
 		state.eatItem.submit(poseStack, collector, light, OverlayTexture.NO_OVERLAY, state.outlineColor);
 		poseStack.popPose();
