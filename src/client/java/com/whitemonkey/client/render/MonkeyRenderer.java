@@ -9,18 +9,13 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
 public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState, MonkeyModel> {
 	private static final Identifier TEXTURE = WhiteMonkeyMod.id("textures/entity/white_monkey.png");
 
-	// posição/escala no ombro direito do jogador (em blocos, referencial do jogador)
-	private static final float SHOULDER_X = 0.30F;
-	private static final float SHOULDER_Y = -0.38F;
-	private static final float SHOULDER_Z = 0.0F;
+	// escala do macaco quando está no ombro (a posição é calculada em MonkeyEntity#followOwner)
 	private static final float SHOULDER_SCALE = 0.55F;
 
 	private final ItemModelResolver itemResolver;
@@ -48,14 +43,6 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 		state.onShoulder = entity.isOnShoulder();
 		state.eating = entity.isEating();
 
-		if (state.onShoulder && entity.getVehicle() instanceof Player player) {
-			// segue a rotação do corpo/cabeça do jogador
-			state.bodyRot = Mth.rotLerp(partialTick, player.yBodyRotO, player.yBodyRot);
-			float head = Mth.rotLerp(partialTick, player.yHeadRotO, player.yHeadRot);
-			state.yRot = Mth.wrapDegrees(head - state.bodyRot);
-			state.xRot = Mth.lerp(partialTick, player.xRotO, player.getXRot());
-		}
-
 		if (state.eating) {
 			state.clip = MonkeyAnimations.EATING;
 			state.clipSeconds = (entity.getEatTicks() + partialTick) / 20.0F;
@@ -79,7 +66,6 @@ public class MonkeyRenderer extends MobRenderer<MonkeyEntity, MonkeyRenderState,
 	protected void setupRotations(MonkeyRenderState state, PoseStack poseStack, float bodyRot, float scale) {
 		super.setupRotations(state, poseStack, bodyRot, scale);
 		if (state.onShoulder) {
-			poseStack.translate(SHOULDER_X, SHOULDER_Y, SHOULDER_Z);
 			poseStack.scale(SHOULDER_SCALE, SHOULDER_SCALE, SHOULDER_SCALE);
 		}
 	}

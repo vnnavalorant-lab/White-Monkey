@@ -37,8 +37,12 @@ public class MonkeyEntity extends PathfinderMob {
 	private static final EntityDataAccessor<ItemStack> EAT_STACK =
 			SynchedEntityData.defineId(MonkeyEntity.class, EntityDataSerializers.ITEM_STACK);
 
+	/** ID (na entidade) do jogador em cujo ombro o macaco está; -1 = livre. */
+	private static final EntityDataAccessor<Integer> OWNER_ID =
+			SynchedEntityData.defineId(MonkeyEntity.class, EntityDataSerializers.INT);
+
 	private int eatTicks;
-	private boolean shoulderGodMode;
+	private boolean perchedGodMode;
 
 	public MonkeyEntity(EntityType<? extends MonkeyEntity> type, Level level) {
 		super(type, level);
@@ -67,6 +71,7 @@ public class MonkeyEntity extends PathfinderMob {
 		super.defineSynchedData(builder);
 		builder.define(EATING, false);
 		builder.define(EAT_STACK, ItemStack.EMPTY);
+		builder.define(OWNER_ID, -1);
 	}
 
 	// ------------------------------------------------------------------ comer
@@ -106,15 +111,24 @@ public class MonkeyEntity extends PathfinderMob {
 	}
 
 	// ------------------------------------------------------------------ ombro
+	// O macaco NÃO é passageiro do jogador (o Minecraft não deixa montar em jogadores);
+	// a cada tick ele é posicionado no ombro direito do dono, no servidor e no cliente.
+
 	public boolean isOnShoulder() {
-		return this.getVehicle() instanceof Player;
+		return this.entityData.get(OWNER_ID) != -1;
+	}
+
+	private Player getShoulderOwner() {
+		int id = this.entityData.get(OWNER_ID);
+		if (id == -1) return null;
+		return this.level().getEntity(id) instanceof Player player ? player : null;
 	}
 
 	public static MonkeyEntity getShoulderMonkey(Player player) {
-		for (Entity passenger : player.getPassengers()) {
-			if (passenger instanceof MonkeyEntity monkey) {
-				return monkey;
-			}
+		for (MonkeyEntity monkey : player.level().getEntitiesOfClass(
+				MonkeyEntity.class, player.getBoundingBox().inflate(6.0),
+				m -> m.entityData.get(OWNER_ID) == player.getId())) {
+			return monkey;
 		}
 		return null;
 	}
@@ -124,21 +138,53 @@ public class MonkeyEntity extends PathfinderMob {
 			return false;
 		}
 		this.getNavigation().stop();
-		if (this.startRiding(player)) {
-			this.shoulderGodMode = true;
-			this.setInvulnerable(true); // evita sufocar dentro de paredes quando o jogador abaixa a cabeça
-			return true;
-		}
-		return false;
+		this.entityData.set(OWNER_ID, player.getId());
+		this.perchedGodMode = true;
+		this.setInvulnerable(true); // evita sufocar em paredes quando o jogador passa por vãos
+		this.setNoGravity(true);
+		return true;
 	}
 
 	public void dismountFromShoulder() {
-		this.stopRiding();
+		if (!this.isOnShoulder()) return;
+		this.entityData.set(OWNER_ID, -1);
+		this.releasePerchState();
+	}
+
+	private void releasePerchState() {
+		if (this.perchedGodMode) {
+			this.perchedGodMode = false;
+			this.setInvulnerable(false);
+			this.setNoGravity(false);
+		}
+	}
+
+	/** Coloca o macaco no ombro direito do jogador e copia a direção do corpo/cabeça dele. */
+	private void followOwner(Player owner) {
+		float yaw = owner.yBodyRot;
+		double rad = Math.toRadians(yaw);
+		double rightX = -Math.cos(rad);
+		double rightZ = -Math.sin(rad);
+		double x = owner.getX() + rightX * 0.34;
+		double y = owner.getY() + owner.getBbHeight() * 0.76;
+		double z = owner.getZ() + rightZ * 0.34;
+		this.setPos(x, y, z);
+		this.setDeltaMovement(0, 0, 0);
+		this.setYRot(yaw);
+		this.setYBodyRot(yaw);
+		this.setYHeadRot(owner.yHeadRot);
+		this.setXRot(owner.getXRot());
+		this.fallDistance = 0;
 	}
 
 	@Override
 	public boolean isPickable() {
-		return !this.isPassenger() && super.isPickable();
+		return !this.isOnShoulder() && super.isPickable();
+	}
+
+	@Override
+	public boolean isPushable() {
+		return !this.isOnShoulder() && super.isPushable();
 	}
 
 	// ------------------------------------------------------------------ interação
@@ -156,7 +202,7 @@ public class MonkeyEntity extends PathfinderMob {
 
 		// Botão direito com comida -> o macaco come (anima "eating" com o item no bone item_eat)
 		ItemStack stack = player.getItemInHand(hand);
-		if (!this.isEating() && !this.isPassenger() && stack.has(DataComponents.FOOD)) {
+		if (!this.isEating() && !this.isOnShoulder() && stack.has(DataComponents.FOOD)) {
 			if (!this.level().isClientSide()) {
 				this.startEating(stack);
 				stack.consume(1, player);
@@ -173,7 +219,7 @@ public class MonkeyEntity extends PathfinderMob {
 		if (this.isEating()) {
 			this.eatTicks++;
 			if (!this.level().isClientSide()) {
-				if (this.isPassenger() || this.getEatStack().isEmpty()) {
+				if (this.isOnShoulder() || this.getEatStack().isEmpty()) {
 					this.finishEating();
 				} else if (this.eatTicks % 8 == 4) {
 					this.playSound(unwrap(SoundEvents.GENERIC_EAT), 0.6F, 0.9F + this.random.nextFloat() * 0.3F);
@@ -186,13 +232,16 @@ public class MonkeyEntity extends PathfinderMob {
 			this.eatTicks = 0;
 		}
 
-		if (!this.level().isClientSide()) {
-			if (this.isOnShoulder()) {
+		if (this.isOnShoulder()) {
+			Player owner = this.getShoulderOwner();
+			if (owner != null && owner.isAlive() && !owner.isSpectator()) {
 				this.getNavigation().stop();
-			} else if (this.shoulderGodMode) {
-				this.shoulderGodMode = false;
-				this.setInvulnerable(false);
+				this.followOwner(owner);
+			} else if (!this.level().isClientSide()) {
+				this.dismountFromShoulder(); // dono saiu, morreu ou mudou de dimensão
 			}
+		} else if (!this.level().isClientSide()) {
+			this.releasePerchState();
 		}
 	}
 
